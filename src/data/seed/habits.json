@@ -1,0 +1,26 @@
+[
+  {
+    "id": "habit-gym",
+    "name": "Gym session",
+    "category": "health",
+    "targetPerWeek": 5,
+    "sampleSeed": 0,
+    "sampleHitRate": 0
+  },
+  {
+    "id": "habit-water",
+    "name": "Water - 3L",
+    "category": "health",
+    "targetPerWeek": 7,
+    "sampleSeed": 0,
+    "sampleHitRate": 0
+  },
+  {
+    "id": "habit-vitamins",
+    "name": "Vitamins",
+    "category": "health",
+    "targetPerWeek": 7,
+    "sampleSeed": 0,
+    "sampleHitRate": 0
+  }
+]

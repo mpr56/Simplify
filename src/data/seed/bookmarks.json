@@ -1,0 +1,5 @@
+[
+  { "id": "gmail", "label": "Gmail", "url": "https://mail.google.com", "icon": "/icons/gmail.png" },
+  { "id": "github", "label": "GitHub", "url": "https://github.com", "icon": "/icons/github.png" },
+  { "id": "leetcode", "label": "LeetCode", "url": "https://leetcode.com", "icon": "/icons/leetcode.png" }
+]

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+
+# Local env; .env.example is committed as the reference.
+.env
+.env.local
+.env.*.local
+
+# The live dashboard document is device state, not source. Seed data lives
+# in src/data/seed/*.json.
+data/dashboard.json
+
+
+.DS_Store
+*.log

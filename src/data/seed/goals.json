@@ -1,0 +1,34 @@
+[
+  {
+    "id": "goal-fund",
+    "title": "Save $5k trip money in addition to 20k savings",
+    "category": "money",
+    "epicId": "epic-runway",
+    "status": "doing",
+    "subtasksDone": 3,
+    "subtasksTotal": 5,
+    "due": "due Dec '26",
+    "progress": 0
+  },
+  {
+    "id": "goal-invest",
+    "title": "Automate index fund investments",
+    "category": "money",
+    "epicId": "epic-runway",
+    "status": "doing",
+    "subtasksDone": 0,
+    "subtasksTotal": 2,
+    "due": "due Sep '26",
+    "progress": 0
+  },
+  {
+    "id": "goal-leetcode",
+    "title": "150 Corporate LeetCode problems",
+    "category": "coding",
+    "status": "doing",
+    "subtasksDone": 0,
+    "subtasksTotal": 150,
+    "due": "due ongoing",
+    "progress": 0
+  }
+]

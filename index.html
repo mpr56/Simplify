@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Dashboard</title>
+    <!-- Optional shared secret. Vite substitutes this at build time; when the
+         variable is unset the placeholder survives verbatim and is ignored. -->
+    <meta name="dashboard-key" content="%VITE_DASHBOARD_KEY%" />
+    <script>
+      // Start the document fetch before the bundle has downloaded or parsed,
+      // so the request is not queued behind JS parse and React mount.
+      // src/lib/sync.ts consumes this promise exactly once.
+      (function () {
+        var meta = document.querySelector('meta[name="dashboard-key"]')
+        var key = meta ? meta.content : ''
+        var headers = key && key.indexOf('%') === -1 ? { 'x-dashboard-key': key } : undefined
+        try {
+          window.__dashboardBoot = fetch('/api/data', headers ? { headers: headers } : undefined)
+        } catch (error) {
+          // Nothing to do — sync.ts falls back to its own fetch.
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

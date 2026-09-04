@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------
+   Design tokens
+   Series colors are validated for the dark surface (OKLCH L 0.48–0.67,
+   >=3:1 contrast, adjacent-pair CVD deltaE >= 8). Do not hand-tweak a
+   single hue without re-running the palette validator on the whole set.
+   ------------------------------------------------------------------ */
+@theme {
+  --font-display: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Surfaces — near-black OLED stack */
+  --color-canvas: #0a0a0b;
+  --color-surface-1: #131315;
+  --color-surface-2: #1a1a1d;
+  --color-surface-3: #232327;
+
+  /* Lines */
+  --color-line: #212124;
+  --color-line-strong: #2f2f35;
+
+  /* Ink */
+  --color-ink: #f4f4f5;
+  --color-ink-2: #a1a1aa;
+  --color-ink-3: #71717a;
+
+  /* Categorical series — validated set */
+  --color-series-1: #5b69e8;
+  --color-series-2: #b5870d;
+  --color-series-3: #12a090;
+  --color-series-4: #de5a57;
+  --color-series-5: #1c4300;
+
+  /* Brand accent */
+  --color-accent: #8b72ee;
+  --color-accent-soft: #a78bfa;
+
+  /* Status — reserved, never reused as a series color */
+  --color-good: #199e70;
+  --color-warning: #c98500;
+  --color-critical: #e66767;
+
+  --radius-card: 1rem;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 8px 30px rgb(0 0 0 / 0.5);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Visible focus for keyboard users on every interactive element */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-soft);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+  }
+
+  /* Recessive scrollbars — the data should carry the contrast, not the chrome */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+@layer utilities {
+  /* Tabular figures keep stat tiles from shifting as numbers change */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
