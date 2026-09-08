@@ -30,10 +30,12 @@ function normalizeAnchor(period: Period, date: Date): Date {
 }
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
-  // Frozen once: a dashboard left open overnight should not silently
-  // re-anchor "today" under the user mid-interaction.
-  const todayRef = useRef<Date>(new Date())
-  const today = todayRef.current
+  // A snapshot, not a constant: it holds still through a session so nothing
+  // shifts mid-interaction, and the rollover effect below advances it when the
+  // wall clock actually crosses midnight.
+  const [today, setToday] = useState<Date>(() => new Date())
+  const todayRef = useRef(today)
+  todayRef.current = today
   const todayISO = useMemo(() => toISO(today), [today])
 
   // Render immediately from cache (or seed); the remote document lands after.
@@ -44,7 +46,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [period, setPeriodState] = useState<Period>(
     () => loadJSON<Period>('period') ?? 'daily',
   )
-  const [anchor, setAnchorState] = useState<Date>(() => today)
+  // Normalized against the restored period: a session that ended on Weekly
+  // must come back anchored to the start of this week, not to a raw today
+  // that week/month math would then have to guess at.
+  const [anchor, setAnchorState] = useState<Date>(() => normalizeAnchor(period, today))
   const [query, setQuery] = useState('')
   const [ready, setReady] = useState(false)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('unknown')
@@ -53,6 +58,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   dataRef.current = data
   const statusRef = useRef(syncStatus)
   statusRef.current = syncStatus
+  /** Read by the midnight rollover, which is mounted once and never re-run. */
+  const periodRef = useRef(period)
+  periodRef.current = period
   /** Set when a change came *from* the remote, so it is not echoed back. */
   const hydratingRef = useRef(false)
   /**
@@ -216,6 +224,61 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('focus', onFocus)
     }
   }, [ready, refetch])
+
+  /**
+   * Midnight rollover. A dashboard is exactly the kind of tab that stays open
+   * overnight, and without this "today" stays on the day the tab was opened —
+   * so the Daily view goes on offering yesterday's habits to tick, and the
+   * date in the header quietly lies.
+   */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const check = () => {
+      const now = new Date()
+      const previous = todayRef.current
+
+      if (toISO(now) !== toISO(previous)) {
+        setToday(now)
+        // Follow the clock only when the view was still sitting on the period
+        // that just ended. Someone who deliberately stepped back to last week
+        // should not have it yanked out from under them at midnight.
+        setAnchorState((current) => {
+          const active = periodRef.current
+          const wasOnToday =
+            toISO(normalizeAnchor(active, current)) ===
+            toISO(normalizeAnchor(active, previous))
+          return wasOnToday ? normalizeAnchor(active, now) : current
+        })
+      }
+
+      schedule()
+    }
+
+    /** Aimed at the next local midnight, rather than polling for it. */
+    const schedule = () => {
+      if (timer !== undefined) clearTimeout(timer)
+      const now = new Date()
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      timer = setTimeout(check, midnight.getTime() - now.getTime() + 1_000)
+    }
+
+    // A machine that slept through midnight fires the timer late or not at
+    // all, so coming back to the tab is the other moment worth checking.
+    const onVisible = () => {
+      if (!document.hidden) check()
+    }
+
+    schedule()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+
+    return () => {
+      if (timer !== undefined) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [])
 
   useEffect(() => {
     saveJSON('period', period)

@@ -101,10 +101,17 @@ function normalizeGoal(input: unknown, epicIds: Set<string>, today: string): Goa
   // rather than orphaned in a group nothing renders.
   const epicId =
     typeof input.epicId === 'string' && epicIds.has(input.epicId) ? input.epicId : undefined
+  // Whitespace-only is the same as absent — it would otherwise show an info
+  // control that opens onto nothing.
+  const description =
+    typeof input.description === 'string' && input.description.trim()
+      ? input.description.trim()
+      : undefined
 
   return {
     id: input.id,
     title: text(input.title, 'Untitled'),
+    ...(description ? { description } : {}),
     category: category(input.category),
     status: status(input.status, input.done),
     ...(epicId ? { epicId } : {}),

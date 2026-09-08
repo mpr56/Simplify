@@ -69,7 +69,11 @@ export interface DashboardActions {
 }
 
 export interface DashboardMeta {
-  /** Frozen at mount so a long-lived tab does not drift mid-session. */
+  /**
+   * Day resolution, and it only ever changes when the calendar day does — so
+   * a long-lived tab does not drift mid-session, but it does roll over at
+   * midnight instead of being stuck on the day it was opened.
+   */
   today: Date
   todayISO: ISODate
 }

@@ -35,6 +35,12 @@ export const STATUS_LABELS: Record<GoalStatus, string> = {
 export interface Goal {
   id: string
   title: string
+  /**
+   * The detail a one-line title cannot hold — why this matters, what done
+   * looks like, what it is waiting on. Optional, and absent rather than empty:
+   * a goal with nothing to say should not render an empty disclosure.
+   */
+  description?: string
   category: CategoryId
   status: GoalStatus
   /** The long-term goal this rolls up into. Unset means standalone. */

@@ -22,8 +22,10 @@ const NO_EPIC = ''
 /** Guards against a pasted 1e9 turning a progress bar into a layout bug. */
 const MAX_SUBTASKS = 9999
 
-const FIELD =
-  'h-10 rounded-lg border border-line bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none'
+/** Split out because the description is a textarea and must not inherit `h-10`. */
+const FIELD_BASE =
+  'rounded-lg border border-line bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none'
+const FIELD = `h-10 ${FIELD_BASE}`
 const LABEL = 'text-xs font-medium text-ink-3'
 
 /**
@@ -56,6 +58,7 @@ export function GoalForm({
 }) {
   const uid = useId()
   const [title, setTitle] = useState(initial?.title ?? '')
+  const [description, setDescription] = useState(initial?.description ?? '')
   const [category, setCategory] = useState<CategoryId>(initial?.category ?? 'work')
   const [status, setStatus] = useState<GoalStatus>(initial?.status ?? 'todo')
   const [epicId, setEpicId] = useState<string>(initial?.epicId ?? NO_EPIC)
@@ -74,6 +77,10 @@ export function GoalForm({
     if (!trimmed) return
     onSubmit({
       title: trimmed,
+      // Always present, for the same reason as `epicId` below: the draft is
+      // merged over the stored goal, so a missing key would keep a
+      // description the user just cleared.
+      description: description.trim() || undefined,
       category,
       status,
       // Always present, never omitted: `updateGoal` merges the draft over the
@@ -210,6 +217,22 @@ export function GoalForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`${uid}-description`} className={LABEL}>
+          Description
+        </label>
+        {/* Enter must not submit here, unlike every other field on this form —
+            a description is the one place a newline is the point. */}
+        <textarea
+          id={`${uid}-description`}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          rows={3}
+          placeholder="Why this matters, what done looks like, what it is waiting on…"
+          className={`${FIELD_BASE} min-h-20 resize-y py-2 leading-snug`}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

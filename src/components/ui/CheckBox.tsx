@@ -9,20 +9,24 @@ export function CheckBox({
   onChange,
   color,
   label,
+  disabled,
   className,
 }: {
   checked: boolean
   onChange: () => void
   color: string
   label: string
+  /** For a day that has not happened yet — the box still reads, it just won't tick. */
+  disabled?: boolean
   className?: string
 }) {
   return (
     <label
       className={cn(
-        'group relative inline-flex cursor-pointer items-center justify-center',
+        'group relative inline-flex items-center justify-center',
         // 44px hit target around a 22px visual box, per touch-target guidance.
         'h-11 w-11 -m-2.5',
+        disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
         className,
       )}
     >
@@ -30,6 +34,7 @@ export function CheckBox({
         type="checkbox"
         checked={checked}
         onChange={onChange}
+        disabled={disabled}
         aria-label={label}
         className="peer sr-only"
       />
@@ -41,7 +46,9 @@ export function CheckBox({
           'transition-colors duration-200',
           'border-[var(--c)] peer-focus-visible:outline peer-focus-visible:outline-2',
           'peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-soft',
-          checked ? 'bg-[var(--c)]' : 'bg-transparent group-hover:bg-[var(--c)]/15',
+          checked
+            ? 'bg-[var(--c)]'
+            : cn('bg-transparent', !disabled && 'group-hover:bg-[var(--c)]/15'),
         )}
       >
         {checked && (

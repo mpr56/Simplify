@@ -1,20 +1,36 @@
 import { useMemo, useState } from 'react'
 import { Pencil, Plus } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { DayDots } from '@/components/charts/DayDots'
+import { CheckBox } from '@/components/ui/CheckBox'
 import { HabitForm } from './HabitForm'
 import { useDashboard } from '@/store/useDashboard'
 import { filterHabits, habitStats, sliceRange } from '@/lib/selectors'
 import { categoryColor } from '@/lib/colors'
-import { addDays } from '@/lib/date'
+import { addDays, toISO } from '@/lib/date'
 
-/** Rolling 7-day strip ending on the anchor date — the wireframe's habit card. */
+/**
+ * One tick box per habit for the anchored day — this panel lives in the Daily
+ * view, where the job is to check today off, and a 7-day strip made you aim at
+ * the right cell out of seven to do it. The rolling week count stays as the
+ * context the single box cannot carry on its own.
+ */
 export function HabitsPanel({ className }: { className?: string }) {
   const { state, actions, meta } = useDashboard()
   const [composing, setComposing] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const habits = filterHabits(state.data.habits, state.query)
   const editing = habits.find((habit) => habit.id === editingId) ?? null
+
+  const iso = toISO(state.anchor)
+  const isFuture = iso > meta.todayISO
+  const dayLabel =
+    iso === meta.todayISO
+      ? 'today'
+      : state.anchor.toLocaleDateString(undefined, {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
 
   const stats = useMemo(() => {
     const end = state.anchor
@@ -28,7 +44,7 @@ export function HabitsPanel({ className }: { className?: string }) {
       <Card.Header>
         <Card.Title>Habits</Card.Title>
         <div className="flex items-center gap-3">
-          <Card.Meta className="hidden sm:inline">last 7 days</Card.Meta>
+          <Card.Meta className="hidden sm:inline">{dayLabel}</Card.Meta>
           <button
             type="button"
             onClick={() => {
@@ -90,8 +106,9 @@ export function HabitsPanel({ className }: { className?: string }) {
           </p>
         ) : (
           <ul className="space-y-1">
-            {stats.map(({ habit, days, completed, target }) => {
+            {stats.map(({ habit, completed, target }) => {
               const color = categoryColor(habit.category)
+              const done = Boolean(habit.history[iso])
               return (
                 <li key={habit.id} className="group flex items-center gap-3 py-2.5">
                   <span
@@ -105,11 +122,17 @@ export function HabitsPanel({ className }: { className?: string }) {
                       {completed}/{target} this week
                     </p>
                   </div>
-                  <DayDots
-                    days={days}
+                  <CheckBox
+                    checked={done}
+                    onChange={() => actions.toggleHabit(habit.id, iso)}
                     color={color}
-                    habitName={habit.name}
-                    onToggle={(iso) => actions.toggleHabit(habit.id, iso)}
+                    disabled={isFuture}
+                    label={
+                      isFuture
+                        ? `"${habit.name}" on ${dayLabel} — upcoming`
+                        : `Mark "${habit.name}" ${done ? 'not done' : 'done'} ${dayLabel === 'today' ? 'today' : `on ${dayLabel}`}`
+                    }
+                    className="mr-1 shrink-0"
                   />
                   {/* Revealed on hover on pointer devices; on touch, where there
                       is no hover, it stays visible. */}

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Columns3, List, Pencil, Plus, X } from 'lucide-react'
+import { useId, useState } from 'react'
+import { Columns3, Info, List, Pencil, Plus, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { CheckBox } from '@/components/ui/CheckBox'
 import { Progress } from '@/components/ui/Progress'
@@ -24,6 +24,7 @@ type ViewMode = 'list' | 'board'
 function draftOf(goal: Goal): GoalDraft {
   return {
     title: goal.title,
+    description: goal.description,
     category: goal.category,
     status: goal.status,
     epicId: goal.epicId,
@@ -32,6 +33,64 @@ function draftOf(goal: Goal): GoalDraft {
     subtasksTotal: goal.subtasksTotal,
     progress: goal.progress,
   }
+}
+
+/**
+ * The disclosure for `goal.description`. Rendered only when there is one to
+ * show — an info control that opens onto nothing is worse than no control, and
+ * it keeps the row from growing a permanent slot most goals leave empty.
+ */
+function InfoToggle({
+  goal,
+  expanded,
+  panelId,
+  onToggle,
+}: {
+  goal: Goal
+  expanded: boolean
+  panelId: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-controls={panelId}
+      aria-label={`${expanded ? 'Hide' : 'Show'} description for "${goal.title}"`}
+      title={expanded ? 'Hide description' : 'Show description'}
+      className={cn(
+        'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-200 hover:bg-surface-3 hover:text-ink',
+        expanded ? 'text-accent-soft' : 'text-ink-3',
+      )}
+    >
+      <Info aria-hidden="true" className="h-3.5 w-3.5" />
+    </button>
+  )
+}
+
+/** `whitespace-pre-wrap` so the paragraph breaks the user typed survive. */
+function Description({
+  id,
+  children,
+  className,
+}: {
+  id: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <p
+      id={id}
+      className={cn(
+        'whitespace-pre-wrap break-words border-l-2 border-line-strong bg-surface-2/60 px-3 py-2 text-sm leading-snug text-ink-2',
+        'rounded-r-lg',
+        className,
+      )}
+    >
+      {children}
+    </p>
+  )
 }
 
 function RowActions({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
@@ -64,63 +123,87 @@ function RowActions({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
 function GoalRow({
   goal,
   editing,
+  expanded,
   onEdit,
+  onToggleInfo,
 }: {
   goal: Goal
   editing: boolean
+  expanded: boolean
   onEdit: () => void
+  onToggleInfo: () => void
 }) {
   const { actions } = useDashboard()
   const color = categoryColor(goal.category)
   const done = goal.status === 'done'
+  const descriptionId = useId()
 
   return (
     <div
       className={cn(
-        'group flex items-center gap-3 rounded-lg px-1 py-3.5 transition-colors duration-200',
+        'rounded-lg transition-colors duration-200',
         editing && 'bg-surface-2 ring-1 ring-accent/40',
       )}
     >
-      {/* The checkbox is the fast path for the common transition; the status
-          control next to it covers the three states a checkbox cannot say. */}
-      <CheckBox
-        checked={done}
-        onChange={() => actions.setGoalStatus(goal.id, done ? 'todo' : 'done')}
-        color={color}
-        label={`Mark "${goal.title}" ${done ? 'not done' : 'done'}`}
-      />
+      <div className="group flex items-center gap-3 px-1 py-3.5">
+        {/* The checkbox is the fast path for the common transition; the status
+            control next to it covers the three states a checkbox cannot say. */}
+        <CheckBox
+          checked={done}
+          onChange={() => actions.setGoalStatus(goal.id, done ? 'todo' : 'done')}
+          color={color}
+          label={`Mark "${goal.title}" ${done ? 'not done' : 'done'}`}
+        />
 
-      <div className="min-w-0 flex-1">
-        <p
-          className={cn(
-            'truncate font-medium transition-colors duration-200',
-            done ? 'text-ink-3 line-through' : 'text-ink',
-          )}
-        >
-          {goal.title}
-        </p>
-        <p className="nums mt-0.5 truncate text-xs text-ink-3">
-          {goal.subtasksDone}/{goal.subtasksTotal} sub-tasks · {goal.due}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              'truncate font-medium transition-colors duration-200',
+              done ? 'text-ink-3 line-through' : 'text-ink',
+            )}
+          >
+            {goal.title}
+          </p>
+          <p className="nums mt-0.5 truncate text-xs text-ink-3">
+            {goal.subtasksDone}/{goal.subtasksTotal} sub-tasks · {goal.due}
+          </p>
+        </div>
+
+        {goal.description && (
+          <InfoToggle
+            goal={goal}
+            expanded={expanded}
+            panelId={descriptionId}
+            onToggle={onToggleInfo}
+          />
+        )}
+
+        <StatusSelect
+          status={goal.status}
+          onChange={(status) => actions.setGoalStatus(goal.id, status)}
+          label={`Status of "${goal.title}"`}
+        />
+
+        <Tag category={goal.category} className="hidden lg:inline-flex" />
+
+        <div className="hidden w-28 shrink-0 sm:block">
+          <Progress value={goal.progress} color={color} label={`${goal.title} progress`} />
+        </div>
+
+        <span className="nums w-11 shrink-0 text-right text-sm text-ink-2">
+          {goal.progress}%
+        </span>
+
+        <RowActions goal={goal} onEdit={onEdit} />
       </div>
 
-      <StatusSelect
-        status={goal.status}
-        onChange={(status) => actions.setGoalStatus(goal.id, status)}
-        label={`Status of "${goal.title}"`}
-      />
-
-      <Tag category={goal.category} className="hidden lg:inline-flex" />
-
-      <div className="hidden w-28 shrink-0 sm:block">
-        <Progress value={goal.progress} color={color} label={`${goal.title} progress`} />
-      </div>
-
-      <span className="nums w-11 shrink-0 text-right text-sm text-ink-2">
-        {goal.progress}%
-      </span>
-
-      <RowActions goal={goal} onEdit={onEdit} />
+      {/* Indented to start under the title, not under the checkbox, so it
+          reads as belonging to the goal rather than to the list. */}
+      {expanded && goal.description && (
+        <Description id={descriptionId} className="mb-3 ml-10 mr-1">
+          {goal.description}
+        </Description>
+      )}
     </div>
   )
 }
@@ -130,7 +213,9 @@ function GoalCard({
   epic,
   editing,
   dragging,
+  expanded,
   onEdit,
+  onToggleInfo,
   onDragStart,
   onDragEnd,
 }: {
@@ -138,12 +223,15 @@ function GoalCard({
   epic: Epic | undefined
   editing: boolean
   dragging: boolean
+  expanded: boolean
   onEdit: () => void
+  onToggleInfo: () => void
   onDragStart: () => void
   onDragEnd: () => void
 }) {
   const { actions } = useDashboard()
   const color = categoryColor(goal.category)
+  const descriptionId = useId()
 
   return (
     <article
@@ -169,6 +257,14 @@ function GoalCard({
         >
           {goal.title}
         </p>
+        {goal.description && (
+          <InfoToggle
+            goal={goal}
+            expanded={expanded}
+            panelId={descriptionId}
+            onToggle={onToggleInfo}
+          />
+        )}
         <RowActions goal={goal} onEdit={onEdit} />
       </div>
 
@@ -176,6 +272,12 @@ function GoalCard({
         <p className="mt-1 truncate text-xs text-ink-3" title={epic.title}>
           ↳ {epic.title}
         </p>
+      )}
+
+      {expanded && goal.description && (
+        <Description id={descriptionId} className="mt-2">
+          {goal.description}
+        </Description>
       )}
 
       <div className="mt-2.5 flex items-center gap-2">
@@ -210,8 +312,10 @@ function BoardColumn({
   epicOf,
   editingId,
   draggingId,
+  expandedIds,
   isDropTarget,
   onEdit,
+  onToggleInfo,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -223,8 +327,10 @@ function BoardColumn({
   epicOf: (goal: Goal) => Epic | undefined
   editingId: string | null
   draggingId: string | null
+  expandedIds: ReadonlySet<string>
   isDropTarget: boolean
   onEdit: (goalId: string) => void
+  onToggleInfo: (goalId: string) => void
   onDragStart: (goalId: string) => void
   onDragEnd: () => void
   onDragOver: () => void
@@ -267,7 +373,9 @@ function BoardColumn({
             epic={epicOf(goal)}
             editing={editingId === goal.id}
             dragging={draggingId === goal.id}
+            expanded={expandedIds.has(goal.id)}
             onEdit={() => onEdit(goal.id)}
+            onToggleInfo={() => onToggleInfo(goal.id)}
             onDragStart={() => onDragStart(goal.id)}
             onDragEnd={onDragEnd}
           />
@@ -289,6 +397,17 @@ export function GoalsPanel({ className }: { className?: string }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<GoalStatus | null>(null)
+  // A set rather than one open id: comparing two goals' notes is the reason
+  // you open them at all, and closing one to read the next defeats that.
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set())
+
+  const toggleInfo = (goalId: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current)
+      if (!next.delete(goalId)) next.add(goalId)
+      return next
+    })
+  }
 
   const { epics } = state.data
   const goals = filterGoals(state.data.goals, state.query)
@@ -421,8 +540,10 @@ export function GoalsPanel({ className }: { className?: string }) {
                 epicOf={epicOf}
                 editingId={editingId}
                 draggingId={draggingId}
+                expandedIds={expandedIds}
                 isDropTarget={dropTarget === status}
                 onEdit={startEditing}
+                onToggleInfo={toggleInfo}
                 onDragStart={setDraggingId}
                 onDragEnd={() => {
                   setDraggingId(null)
@@ -451,7 +572,9 @@ export function GoalsPanel({ className }: { className?: string }) {
                       <GoalRow
                         goal={goal}
                         editing={editingId === goal.id}
+                        expanded={expandedIds.has(goal.id)}
                         onEdit={() => startEditing(goal.id)}
+                        onToggleInfo={() => toggleInfo(goal.id)}
                       />
                     </li>
                   ))}
