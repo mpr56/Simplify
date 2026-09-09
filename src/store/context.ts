@@ -35,7 +35,8 @@ export interface DashboardActions {
   stepAnchor: (direction: -1 | 1) => void
   goToToday: () => void
   setQuery: (query: string) => void
-  toggleHabit: (habitId: string, date: ISODate) => void
+  /** Ticks or unticks one step of one day; a habit's day is many of these. */
+  toggleHabit: (habitId: string, date: ISODate, stepId: string) => void
   addHabit: (habit: Omit<Habit, 'id' | 'history'>) => void
   updateHabit: (habitId: string, patch: Partial<Habit>) => void
   /** Takes the habit's logged history with it — there is no undo. */
@@ -66,6 +67,8 @@ export interface DashboardActions {
   addBookmark: (bookmark: Omit<Bookmark, 'id'>) => void
   removeBookmark: (bookmarkId: string) => void
   resetData: () => void
+  /** Replaces the whole document with a restored backup. Already normalized. */
+  importData: (data: DashboardData) => void
 }
 
 export interface DashboardMeta {

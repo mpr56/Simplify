@@ -5,11 +5,12 @@ import type {
   Epic,
   Goal,
   Habit,
+  HabitStep,
   ISODate,
   MacroEntry,
   Task,
 } from './types'
-import { CATEGORIES } from './types'
+import { CATEGORIES, DEFAULT_STEP_ID } from './types'
 import { addDays, toISO } from '@/lib/date'
 import epicsSeed from './seed/epics.json'
 import goalsSeed from './seed/goals.json'
@@ -29,6 +30,8 @@ interface HabitSeed {
   name: string
   category: string
   targetPerWeek: number
+  /** Omitted for a habit that is a single tick a day. */
+  steps?: { id: string; label?: string }[]
   /** PRNG seed for the sample history. */
   sampleSeed: number
   /** Share of days completed in the sample history, 0–1. */
@@ -61,16 +64,20 @@ const HISTORY_DAYS = 120
 function buildHabitHistory(
   seed: number,
   hitRate: number,
+  steps: HabitStep[],
   today: Date,
-): Record<ISODate, boolean> {
+): Record<ISODate, string[]> {
   const random = mulberry32(seed)
-  const history: Record<ISODate, boolean> = {}
+  const every = steps.map((step) => step.id)
+  const history: Record<ISODate, string[]> = {}
   for (let i = HISTORY_DAYS; i >= 0; i--) {
     const date = addDays(today, -i)
     // Weekends drift a little — makes the weekly view show a real pattern.
     const isWeekend = date.getDay() === 0 || date.getDay() === 6
     const chance = isWeekend ? hitRate * 0.7 : hitRate
-    if (random() < chance) history[toISO(date)] = true
+    // Sample days are all-or-nothing: half-finished filler would make the
+    // adherence numbers look broken rather than illustrative.
+    if (random() < chance) history[toISO(date)] = every
   }
   return history
 }
@@ -117,13 +124,23 @@ function buildTasks(today: Date): Task[] {
 }
 
 export function createSeedData(today: Date): DashboardData {
-  const habits: Habit[] = (habitsSeed as HabitSeed[]).map((seed) => ({
-    id: seed.id,
-    name: seed.name,
-    category: seed.category as CategoryId,
-    targetPerWeek: seed.targetPerWeek,
-    history: buildHabitHistory(seed.sampleSeed, seed.sampleHitRate, today),
-  }))
+  const habits: Habit[] = (habitsSeed as HabitSeed[]).map((seed) => {
+    const steps: HabitStep[] = seed.steps?.length
+      ? seed.steps.map((step) => ({
+          id: step.id,
+          ...(step.label ? { label: step.label } : {}),
+        }))
+      : [{ id: DEFAULT_STEP_ID }]
+
+    return {
+      id: seed.id,
+      name: seed.name,
+      category: seed.category as CategoryId,
+      targetPerWeek: seed.targetPerWeek,
+      steps,
+      history: buildHabitHistory(seed.sampleSeed, seed.sampleHitRate, steps, today),
+    }
+  })
 
   const created = toISO(addDays(today, -90))
 

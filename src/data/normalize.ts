@@ -5,6 +5,7 @@ import type {
   Goal,
   GoalStatus,
   Habit,
+  HabitStep,
   ISODate,
   ISODateTime,
   MacroEntry,
@@ -12,7 +13,13 @@ import type {
   Task,
   TrashEntry,
 } from './types'
-import { CATEGORIES, GOAL_STATUSES, TRASH_LIMIT } from './types'
+import {
+  CATEGORIES,
+  DEFAULT_STEP_ID,
+  GOAL_STATUSES,
+  MAX_HABIT_STEPS,
+  TRASH_LIMIT,
+} from './types'
 import { createSeedData } from './seed'
 import { toISO } from '@/lib/date'
 
@@ -127,16 +134,54 @@ function normalizeGoal(input: unknown, epicIds: Set<string>, today: string): Goa
 const MAX_PER_WEEK = 7
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
+/** Never empty: a habit with no slots would be untickable and never done. */
+function normalizeSteps(input: unknown): HabitStep[] {
+  const steps: HabitStep[] = []
+  const seen = new Set<string>()
+
+  if (Array.isArray(input)) {
+    for (const raw of input) {
+      if (!isRecord(raw) || typeof raw.id !== 'string' || seen.has(raw.id)) continue
+      const label =
+        typeof raw.label === 'string' && raw.label.trim() ? raw.label.trim() : undefined
+      seen.add(raw.id)
+      steps.push({ id: raw.id, ...(label ? { label } : {}) })
+      if (steps.length === MAX_HABIT_STEPS) break
+    }
+  }
+
+  // A document predating steps gets the single implicit slot its boolean
+  // history was already recording.
+  return steps.length ? steps : [{ id: DEFAULT_STEP_ID }]
+}
+
 function normalizeHabit(input: unknown): Habit | null {
   if (!isRecord(input) || typeof input.id !== 'string') return null
 
-  // The history is sparse by contract — only completed days are keys. Rebuild
-  // it rather than trusting it, so a stray `false` or a junk key cannot make
-  // the adherence math count a day that was never logged.
-  const history: Record<string, boolean> = {}
+  const steps = normalizeSteps(input.steps)
+  const ids = new Set(steps.map((step) => step.id))
+
+  // The history is sparse by contract — only days with a tick are keys.
+  // Rebuild it rather than trusting it, so a junk key or an id belonging to a
+  // deleted step cannot make the adherence math count a day that was never
+  // logged.
+  const history: Record<string, string[]> = {}
   if (isRecord(input.history)) {
     for (const [date, done] of Object.entries(input.history)) {
-      if (done && ISO_DATE.test(date)) history[date] = true
+      if (!ISO_DATE.test(date)) continue
+
+      // `true` is the pre-steps shape: one boolean meant the whole day was
+      // done, so it maps onto every slot the habit now has.
+      if (done === true) {
+        history[date] = steps.map((step) => step.id)
+        continue
+      }
+
+      if (!Array.isArray(done)) continue
+      const kept = done.filter(
+        (id): id is string => typeof id === 'string' && ids.has(id),
+      )
+      if (kept.length) history[date] = [...new Set(kept)]
     }
   }
 
@@ -145,6 +190,7 @@ function normalizeHabit(input: unknown): Habit | null {
     name: text(input.name, 'Untitled'),
     category: category(input.category),
     targetPerWeek: int(input.targetPerWeek, MAX_PER_WEEK, 1, MAX_PER_WEEK),
+    steps,
     history,
   }
 }

@@ -21,6 +21,30 @@ export interface DaySlice {
   isFuture: boolean
 }
 
+/**
+ * Steps ticked on a day, ignoring ids for steps the habit no longer has — a
+ * shrunken habit must not stay "done" on the strength of a slot it dropped.
+ */
+export function stepsDoneOn(habit: Habit, iso: ISODate): number {
+  const done = habit.history[iso]
+  if (!done?.length) return 0
+  if (habit.steps.length === 1) {
+    return done.includes(habit.steps[0].id) ? 1 : 0
+  }
+  const ids = new Set(habit.steps.map((step) => step.id))
+  return done.reduce((sum, id) => sum + (ids.has(id) ? 1 : 0), 0)
+}
+
+/**
+ * The single definition of a completed habit-day, used by the streak, the
+ * adherence maths, the day strip and the heatmap alike: every step ticked.
+ * Partial days count for nothing here, which is what keeps "3 of 5 gym
+ * sessions this week" meaning what it always meant.
+ */
+export function isHabitDoneOn(habit: Habit, iso: ISODate): boolean {
+  return habit.steps.length > 0 && stepsDoneOn(habit, iso) >= habit.steps.length
+}
+
 /** One row per day in the range — the shared substrate for every period view. */
 export function sliceRange(
   data: DashboardData,
@@ -34,7 +58,10 @@ export function sliceRange(
     return {
       date,
       iso,
-      completed: data.habits.reduce((sum, habit) => sum + (habit.history[iso] ? 1 : 0), 0),
+      completed: data.habits.reduce(
+        (sum, habit) => sum + (isHabitDoneOn(habit, iso) ? 1 : 0),
+        0,
+      ),
       total: data.habits.length,
       macros: data.macros[iso] ?? null,
       isFuture: iso > todayISO,
@@ -49,7 +76,7 @@ export function sliceRange(
 export function habitStreak(habits: Habit[], today: Date): number {
   const hasAny = (date: Date) => {
     const iso = toISO(date)
-    return habits.some((habit) => habit.history[iso])
+    return habits.some((habit) => isHabitDoneOn(habit, iso))
   }
 
   let cursor = hasAny(today) ? today : addDays(today, -1)
@@ -64,7 +91,7 @@ export function habitStreak(habits: Habit[], today: Date): number {
 }
 
 export function habitsDoneOn(habits: Habit[], iso: ISODate): number {
-  return habits.reduce((sum, habit) => sum + (habit.history[iso] ? 1 : 0), 0)
+  return habits.reduce((sum, habit) => sum + (isHabitDoneOn(habit, iso) ? 1 : 0), 0)
 }
 
 export function activeGoals(goals: Goal[]): Goal[] {
@@ -165,7 +192,7 @@ export function habitStats(
   return habits.map((habit) => {
     const days = slices.map((slice) => ({
       iso: slice.iso,
-      done: Boolean(habit.history[slice.iso]),
+      done: isHabitDoneOn(habit, slice.iso),
       isFuture: slice.isFuture,
     }))
     const completed = days.filter((day) => day.done).length

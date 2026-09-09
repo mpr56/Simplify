@@ -19,7 +19,7 @@ import { TRASH_LIMIT } from '@/data/types'
  * directly testable.
  */
 export type Action =
-  | { type: 'toggleHabit'; habitId: string; date: ISODate }
+  | { type: 'toggleHabit'; habitId: string; date: ISODate; stepId: string }
   | { type: 'addHabit'; habit: Habit }
   | { type: 'updateHabit'; habitId: string; patch: Partial<Habit> }
   // Deletes carry their id and timestamp: the reducer stays pure, so the
@@ -53,14 +53,40 @@ function pushTrash(trash: TrashEntry[], entry: TrashEntry): TrashEntry[] {
   return [entry, ...trash].slice(0, TRASH_LIMIT)
 }
 
+/**
+ * Drops ticks for steps the habit no longer has, and days left with none.
+ * Run after the step list changes: a stale id would otherwise sit in the
+ * document forever, invisible, and come back if the step count grew again.
+ */
+function pruneHistory(habit: Habit): Record<ISODate, string[]> {
+  const ids = new Set(habit.steps.map((step) => step.id))
+  const history: Record<ISODate, string[]> = {}
+  for (const [date, done] of Object.entries(habit.history)) {
+    const kept = done.filter((id) => ids.has(id))
+    if (kept.length) history[date] = kept
+  }
+  return history
+}
+
 export function reducer(state: DashboardData, action: Action): DashboardData {
   switch (action.type) {
     case 'toggleHabit': {
       const habits = state.habits.map((habit) => {
         if (habit.id !== action.habitId) return habit
+        // A tick for a step this habit does not have would be unreachable in
+        // the UI and unprunable in the document.
+        if (!habit.steps.some((step) => step.id === action.stepId)) return habit
+
+        const done = habit.history[action.date] ?? []
+        const next = done.includes(action.stepId)
+          ? done.filter((id) => id !== action.stepId)
+          : [...done, action.stepId]
+
         const history = { ...habit.history }
-        if (history[action.date]) delete history[action.date]
-        else history[action.date] = true
+        // The map stays sparse: an emptied day leaves rather than lingering
+        // as `[]`, which every reader would have to treat as absent anyway.
+        if (next.length) history[action.date] = next
+        else delete history[action.date]
         return { ...habit, history }
       })
       return { ...state, habits }
@@ -70,9 +96,11 @@ export function reducer(state: DashboardData, action: Action): DashboardData {
     case 'updateHabit':
       return {
         ...state,
-        habits: state.habits.map((habit) =>
-          habit.id === action.habitId ? { ...habit, ...action.patch } : habit,
-        ),
+        habits: state.habits.map((habit) => {
+          if (habit.id !== action.habitId) return habit
+          const next = { ...habit, ...action.patch }
+          return action.patch.steps ? { ...next, history: pruneHistory(next) } : next
+        }),
       }
     case 'removeHabit': {
       const habit = state.habits.find((candidate) => candidate.id === action.habitId)

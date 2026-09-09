@@ -13,7 +13,7 @@ import type {
 } from '@/data/types'
 import { createSeedData } from '@/data/seed'
 import { normalizeData } from '@/data/normalize'
-import { addDays, startOfMonth, startOfWeek, toISO } from '@/lib/date'
+import { addDays, rangeFor, startOfWeek, toISO } from '@/lib/date'
 import { loadJSON, saveJSON } from '@/lib/storage'
 import { fetchRemote, pushRemote, type SyncStatus } from '@/lib/sync'
 import { reducer } from './reducer'
@@ -22,13 +22,12 @@ import { DashboardContext, type DashboardContextValue } from './context'
 /** How long edits settle before a write goes out. */
 const PUSH_DEBOUNCE_MS = 800
 
-/** Anchors a period to a canonical day so week/month math is stable. */
-function normalizeAnchor(period: Period, date: Date): Date {
-  if (period === 'weekly') return startOfWeek(date)
-  if (period === 'monthly') return startOfMonth(date)
-  return date
-}
-
+/**
+ * The anchor is the precise day the view is pointed at, never snapped to the
+ * start of its week or month: `rangeFor` already derives the window from any
+ * day inside it, so snapping only threw the day away — which is what made
+ * Daily → Weekly → Daily land on Monday.
+ */
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // A snapshot, not a constant: it holds still through a session so nothing
   // shifts mid-interaction, and the rollover effect below advances it when the
@@ -46,10 +45,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [period, setPeriodState] = useState<Period>(
     () => loadJSON<Period>('period') ?? 'daily',
   )
-  // Normalized against the restored period: a session that ended on Weekly
-  // must come back anchored to the start of this week, not to a raw today
-  // that week/month math would then have to guess at.
-  const [anchor, setAnchorState] = useState<Date>(() => normalizeAnchor(period, today))
+  const [anchor, setAnchorState] = useState<Date>(() => today)
   const [query, setQuery] = useState('')
   const [ready, setReady] = useState(false)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('unknown')
@@ -244,11 +240,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         // that just ended. Someone who deliberately stepped back to last week
         // should not have it yanked out from under them at midnight.
         setAnchorState((current) => {
-          const active = periodRef.current
-          const wasOnToday =
-            toISO(normalizeAnchor(active, current)) ===
-            toISO(normalizeAnchor(active, previous))
-          return wasOnToday ? normalizeAnchor(active, now) : current
+          const { start, end } = rangeFor(periodRef.current, current)
+          const heldPrevious =
+            toISO(start) <= toISO(previous) && toISO(previous) <= toISO(end)
+          return heldPrevious ? now : current
         })
       }
 
@@ -284,15 +279,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     saveJSON('period', period)
   }, [period])
 
+  // Changing period always returns to now — to today, to this week, to this
+  // month. Carrying the old anchor across meant Monthly → Daily landed on the
+  // 1st; keeping the day instead would still leave you in March when you
+  // switched, and "where am I?" is the wrong question to ask of a tab click.
   const setPeriod = useCallback((next: Period) => {
     setPeriodState(next)
-    setAnchorState((current) => normalizeAnchor(next, current))
+    setAnchorState(new Date())
   }, [])
 
-  const setAnchor = useCallback(
-    (next: Date) => setAnchorState(normalizeAnchor(period, next)),
-    [period],
-  )
+  const setAnchor = useCallback((next: Date) => setAnchorState(next), [])
 
   const stepAnchor = useCallback(
     (direction: -1 | 1) => {
@@ -306,8 +302,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   )
 
   const goToToday = useCallback(() => {
-    setAnchorState(normalizeAnchor(period, new Date()))
-  }, [period])
+    setAnchorState(new Date())
+  }, [])
 
   const actions = useMemo(
     () => ({
@@ -316,8 +312,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       stepAnchor,
       goToToday,
       setQuery,
-      toggleHabit: (habitId: string, date: ISODate) =>
-        dispatch({ type: 'toggleHabit', habitId, date }),
+      toggleHabit: (habitId: string, date: ISODate, stepId: string) =>
+        dispatch({ type: 'toggleHabit', habitId, date, stepId }),
       addHabit: (habit: Omit<Habit, 'id' | 'history'>) =>
         dispatch({
           type: 'addHabit',
@@ -397,6 +393,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       removeBookmark: (bookmarkId: string) =>
         dispatch({ type: 'removeBookmark', bookmarkId }),
       resetData: () => dispatch({ type: 'reset', data: createSeedData(todayRef.current) }),
+      importData: (next: DashboardData) => dispatch({ type: 'reset', data: next }),
     }),
     [setPeriod, setAnchor, stepAnchor, goToToday],
   )

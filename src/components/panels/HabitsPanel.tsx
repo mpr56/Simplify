@@ -1,12 +1,77 @@
 import { useMemo, useState } from 'react'
 import { Pencil, Plus } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { CheckBox } from '@/components/ui/CheckBox'
 import { HabitForm } from './HabitForm'
 import { useDashboard } from '@/store/useDashboard'
-import { filterHabits, habitStats, sliceRange } from '@/lib/selectors'
+import { filterHabits, habitStats, sliceRange, stepsDoneOn } from '@/lib/selectors'
 import { categoryColor } from '@/lib/colors'
 import { addDays, toISO } from '@/lib/date'
+import type { HabitStep } from '@/data/types'
+import { cn } from '@/lib/cn'
+
+/**
+ * One slot of a split habit. A labelled slot shows its initial and carries the
+ * full label on hover — four boxes reading D/O/M/Z is the difference between
+ * knowing which pill you took and guessing.
+ */
+function StepBox({
+  step,
+  index,
+  count,
+  habitName,
+  color,
+  done,
+  disabled,
+  onToggle,
+}: {
+  step: HabitStep
+  index: number
+  count: number
+  habitName: string
+  color: string
+  done: boolean
+  disabled: boolean
+  onToggle: () => void
+}) {
+  const label = step.label?.trim()
+  // An unsplit habit names only itself: "Gym session — 1 of 1" says nothing.
+  const which = count === 1 ? '' : ` — ${label || `${index + 1} of ${count}`}`
+  const state = disabled ? 'upcoming' : done ? 'done' : 'not done'
+  const title = `${habitName}${which}: ${state}`
+
+  return (
+    // The hit area is the button; the 22px box inside it is the drawing, sized
+    // to match `CheckBox` exactly so a one-tick habit and a split one line up.
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      aria-pressed={done}
+      style={{ '--c': color } as React.CSSProperties}
+      className={cn(
+        'group/step flex h-9 w-7 shrink-0 items-center justify-center focus:outline-none',
+        disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+      )}
+    >
+      <span
+        className={cn(
+          'flex h-[22px] w-[22px] items-center justify-center rounded-[7px] border-2',
+          'text-[10px] font-semibold leading-none transition-colors duration-200',
+          'border-[var(--c)] group-focus-visible/step:outline',
+          'group-focus-visible/step:outline-2 group-focus-visible/step:outline-offset-2',
+          'group-focus-visible/step:outline-accent-soft',
+          done ? 'bg-[var(--c)] text-canvas' : 'bg-transparent text-[var(--c)]',
+          disabled && 'opacity-40',
+          !done && !disabled && 'group-hover/step:bg-[var(--c)]/15',
+        )}
+      >
+        {label ? label[0].toUpperCase() : ''}
+      </span>
+    </button>
+  )
+}
 
 /**
  * One tick box per habit for the anchored day — this panel lives in the Daily
@@ -82,6 +147,7 @@ export function HabitsPanel({ className }: { className?: string }) {
                 name: editing.name,
                 category: editing.category,
                 targetPerWeek: editing.targetPerWeek,
+                steps: editing.steps,
               }}
               submitLabel="Save"
               loggedDays={Object.keys(editing.history).length}
@@ -108,7 +174,9 @@ export function HabitsPanel({ className }: { className?: string }) {
           <ul className="space-y-1">
             {stats.map(({ habit, completed, target }) => {
               const color = categoryColor(habit.category)
-              const done = Boolean(habit.history[iso])
+              const steps = habit.steps
+              const split = steps.length > 1
+              const doneToday = stepsDoneOn(habit, iso)
               return (
                 <li key={habit.id} className="group flex items-center gap-3 py-2.5">
                   <span
@@ -119,21 +187,31 @@ export function HabitsPanel({ className }: { className?: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink">{habit.name}</p>
                     <p className="nums text-xs text-ink-3">
+                      {/* The header already names the day, so the per-day count
+                          does not have to repeat it. */}
+                      {split && `${doneToday}/${steps.length} done · `}
                       {completed}/{target} this week
                     </p>
                   </div>
-                  <CheckBox
-                    checked={done}
-                    onChange={() => actions.toggleHabit(habit.id, iso)}
-                    color={color}
-                    disabled={isFuture}
-                    label={
-                      isFuture
-                        ? `"${habit.name}" on ${dayLabel} — upcoming`
-                        : `Mark "${habit.name}" ${done ? 'not done' : 'done'} ${dayLabel === 'today' ? 'today' : `on ${dayLabel}`}`
-                    }
-                    className="mr-1 shrink-0"
-                  />
+
+                  {/* One box or twelve, they all render through StepBox — a
+                      split habit whose ticks were a different size from an
+                      unsplit one read as a different kind of control. */}
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                    {steps.map((step, index) => (
+                      <StepBox
+                        key={step.id}
+                        step={step}
+                        index={index}
+                        count={steps.length}
+                        habitName={habit.name}
+                        color={color}
+                        done={(habit.history[iso] ?? []).includes(step.id)}
+                        disabled={isFuture}
+                        onToggle={() => actions.toggleHabit(habit.id, iso, step.id)}
+                      />
+                    ))}
+                  </div>
                   {/* Revealed on hover on pointer devices; on touch, where there
                       is no hover, it stays visible. */}
                   <button

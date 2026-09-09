@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { reducer } from './reducer'
-import type { DashboardData, Task } from '@/data/types'
+import type { DashboardData, Habit, Task } from '@/data/types'
 
 const AT = '2026-09-04T12:00:00.000Z'
 
@@ -81,5 +81,110 @@ describe('task actions', () => {
     const before = state([task()])
     reducer(before, { type: 'toggleTask', taskId: 'task-1', at: AT })
     expect(before.tasks[0].done).toBe(false)
+  })
+})
+
+const DAY = '2026-09-08'
+
+function habit(overrides: Partial<Habit> = {}): Habit {
+  return {
+    id: 'habit-1',
+    name: 'Vitamins',
+    category: 'health',
+    targetPerWeek: 7,
+    steps: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    history: {},
+    ...overrides,
+  }
+}
+
+function withHabits(habits: Habit[]): DashboardData {
+  return { ...state([]), habits }
+}
+
+describe('habit step actions', () => {
+  it('ticks one step without touching its siblings', () => {
+    const next = reducer(withHabits([habit()]), {
+      type: 'toggleHabit',
+      habitId: 'habit-1',
+      date: DAY,
+      stepId: 'b',
+    })
+
+    expect(next.habits[0].history[DAY]).toEqual(['b'])
+  })
+
+  it('unticks a step it already holds', () => {
+    const next = reducer(withHabits([habit({ history: { [DAY]: ['a', 'b'] } })]), {
+      type: 'toggleHabit',
+      habitId: 'habit-1',
+      date: DAY,
+      stepId: 'a',
+    })
+
+    expect(next.habits[0].history[DAY]).toEqual(['b'])
+  })
+
+  it('drops the day entirely once its last step is unticked, keeping the map sparse', () => {
+    const next = reducer(withHabits([habit({ history: { [DAY]: ['a'] } })]), {
+      type: 'toggleHabit',
+      habitId: 'habit-1',
+      date: DAY,
+      stepId: 'a',
+    })
+
+    expect(DAY in next.habits[0].history).toBe(false)
+  })
+
+  it('ignores a step the habit does not have', () => {
+    const before = withHabits([habit()])
+    const next = reducer(before, {
+      type: 'toggleHabit',
+      habitId: 'habit-1',
+      date: DAY,
+      stepId: 'nope',
+    })
+
+    expect(next.habits[0].history).toEqual({})
+  })
+
+  it('discards ticks belonging to steps removed by an update', () => {
+    const next = reducer(
+      withHabits([habit({ history: { [DAY]: ['a', 'b', 'c'] } })]),
+      {
+        type: 'updateHabit',
+        habitId: 'habit-1',
+        patch: { steps: [{ id: 'a' }] },
+      },
+    )
+
+    expect(next.habits[0].history[DAY]).toEqual(['a'])
+  })
+
+  it('drops a day left with nothing after steps are removed', () => {
+    const next = reducer(withHabits([habit({ history: { [DAY]: ['c'] } })]), {
+      type: 'updateHabit',
+      habitId: 'habit-1',
+      patch: { steps: [{ id: 'a' }, { id: 'b' }] },
+    })
+
+    expect(DAY in next.habits[0].history).toBe(false)
+  })
+
+  it('leaves history alone when an update does not touch the steps', () => {
+    const next = reducer(withHabits([habit({ history: { [DAY]: ['a'] } })]), {
+      type: 'updateHabit',
+      habitId: 'habit-1',
+      patch: { name: 'Supplements' },
+    })
+
+    expect(next.habits[0].history[DAY]).toEqual(['a'])
+    expect(next.habits[0].name).toBe('Supplements')
+  })
+
+  it('does not mutate the incoming state', () => {
+    const before = withHabits([habit({ history: { [DAY]: ['a'] } })])
+    reducer(before, { type: 'toggleHabit', habitId: 'habit-1', date: DAY, stepId: 'b' })
+    expect(before.habits[0].history[DAY]).toEqual(['a'])
   })
 })

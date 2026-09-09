@@ -1,8 +1,9 @@
 import { useId, useRef, useState } from 'react'
-import { RotateCcw, Search } from 'lucide-react'
+import { RotateCcw, Search, Settings } from 'lucide-react'
 import { SyncBadge } from '@/components/ui/SyncBadge'
 import { RecycleBinMenu } from './RecycleBinMenu'
 import { ResetDialog } from './ResetDialog'
+import { SettingsDialog } from './SettingsDialog'
 import { useDashboard } from '@/store/useDashboard'
 import { activeGoals } from '@/lib/selectors'
 import { greeting } from '@/lib/date'
@@ -11,13 +12,20 @@ export function TopBar() {
   const { state, actions, meta } = useDashboard()
   const searchId = useId()
   const [resetOpen, setResetOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const resetButtonRef = useRef<HTMLButtonElement>(null)
+  const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const inMotion = activeGoals(state.data.goals).length
 
   const closeReset = () => {
     setResetOpen(false)
     // Leave focus where it started rather than adrift on the body.
     resetButtonRef.current?.focus()
+  }
+
+  const closeSettings = () => {
+    setSettingsOpen(false)
+    settingsButtonRef.current?.focus()
   }
 
   return (
@@ -63,6 +71,18 @@ export function TopBar() {
 
         <RecycleBinMenu />
 
+        <button
+          ref={settingsButtonRef}
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          aria-haspopup="dialog"
+          title="Settings"
+          aria-label="Settings"
+          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-surface-1 text-ink-2 transition-colors duration-200 hover:border-line-strong hover:text-ink"
+        >
+          <Settings aria-hidden="true" className="h-4 w-4" />
+        </button>
+
         {/* Reset replaces the whole document — goals, habits, macros, and the
             recycle bin with them. Clicking only opens the dialog; the
             destructive step is behind a word you have to type. */}
@@ -78,6 +98,8 @@ export function TopBar() {
           <RotateCcw aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
+
+      {settingsOpen && <SettingsDialog onClose={closeSettings} />}
 
       {resetOpen && (
         <ResetDialog

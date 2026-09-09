@@ -85,14 +85,38 @@ export interface Epic {
   createdAt: ISODate
 }
 
+/**
+ * One tickable slot inside a habit's day — a glass of water, a specific
+ * vitamin. The label is optional because both shapes are wanted: three
+ * interchangeable glasses need no names, four different pills do.
+ */
+export interface HabitStep {
+  id: string
+  /** Unnamed slots render as plain boxes; named ones show their initial. */
+  label?: string
+}
+
+/** Enough for a pill organiser without letting the row stop fitting a phone. */
+export const MAX_HABIT_STEPS = 12
+
+/** The slot every habit has before anyone splits it up, and after a migration. */
+export const DEFAULT_STEP_ID = 'step-1'
+
 export interface Habit {
   id: string
   name: string
   category: CategoryId
   /** Times per week the habit is meant to be hit. Drives weekly/monthly adherence. */
   targetPerWeek: number
-  /** Sparse map — only completed dates are stored. */
-  history: Record<ISODate, boolean>
+  /** Ordered slots to tick each day. Never empty — a habit has at least one. */
+  steps: HabitStep[]
+  /**
+   * Sparse map: only days with at least one tick appear, and each holds the
+   * step ids completed that day. A day counts as done only once every step is
+   * in it, so a one-step habit behaves exactly as it did when this was a
+   * boolean.
+   */
+  history: Record<ISODate, string[]>
 }
 
 export interface MacroEntry {

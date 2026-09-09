@@ -1,11 +1,17 @@
 import { useId, useState } from 'react'
 import { Trash2 } from 'lucide-react'
-import { CATEGORY_LIST, type CategoryId, type Habit } from '@/data/types'
+import {
+  CATEGORY_LIST,
+  MAX_HABIT_STEPS,
+  type CategoryId,
+  type Habit,
+  type HabitStep,
+} from '@/data/types'
 
 /** History belongs to the habit's use, not its definition, so it is not edited here. */
 export type HabitDraft = Omit<Habit, 'id' | 'history'>
 
-/** One boolean per day is all the history can hold, so 7 is the real ceiling. */
+/** A habit is hit at most once a day, so 7 is the real ceiling. */
 const MAX_PER_WEEK = 7
 
 const FIELD =
@@ -33,12 +39,52 @@ export function HabitForm({
   const [name, setName] = useState(initial?.name ?? '')
   const [category, setCategory] = useState<CategoryId>(initial?.category ?? 'gym')
   const [targetPerWeek, setTargetPerWeek] = useState(initial?.targetPerWeek ?? MAX_PER_WEEK)
+  const [steps, setSteps] = useState<HabitStep[]>(
+    () => initial?.steps ?? [{ id: `step-${crypto.randomUUID()}` }],
+  )
+
+  const originalCount = initial?.steps.length ?? 0
+  // Shrinking discards the ticks logged against the slots that go, so the cost
+  // is stated before the save, the way deleting a habit already does.
+  const dropping = originalCount > steps.length
+
+  /**
+   * Resizing keeps the surviving slots' ids, so changing 3 to 4 does not
+   * silently reset the history of the first three.
+   */
+  const resize = (count: number) => {
+    setSteps((current) => {
+      if (count <= current.length) return current.slice(0, count)
+      return [
+        ...current,
+        ...Array.from({ length: count - current.length }, () => ({
+          id: `step-${crypto.randomUUID()}`,
+        })),
+      ]
+    })
+  }
+
+  const relabel = (index: number, label: string) => {
+    setSteps((current) =>
+      current.map((step, at) => (at === index ? { ...step, label } : step)),
+    )
+  }
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    onSubmit({ name: trimmed, category, targetPerWeek })
+    onSubmit({
+      name: trimmed,
+      category,
+      targetPerWeek,
+      // Blank labels are dropped rather than stored as '' — an unnamed slot is
+      // a plain box, and `label: ''` would render an empty letter instead.
+      steps: steps.map(({ id, label }) => ({
+        id,
+        ...(label?.trim() ? { label: label.trim() } : {}),
+      })),
+    })
   }
 
   return (
@@ -102,6 +148,52 @@ export function HabitForm({
           </select>
         </div>
       </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`${uid}-steps`} className={LABEL}>
+          Sub-tasks per day
+        </label>
+        <select
+          id={`${uid}-steps`}
+          value={steps.length}
+          onChange={(event) => resize(Number(event.target.value))}
+          className={`${FIELD} w-44 cursor-pointer px-2`}
+        >
+          {Array.from({ length: MAX_HABIT_STEPS }, (_, index) => index + 1).map((count) => (
+            <option key={count} value={count}>
+              {count === 1 ? 'Just one tick' : `${count} sub-tasks`}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Labels only appear once there is more than one slot: naming the single
+          tick of an unsplit habit would just be repeating its name. */}
+      {steps.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <span className={LABEL}>Labels — optional, blank stays a plain box</span>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {steps.map((step, index) => (
+              <input
+                key={step.id}
+                value={step.label ?? ''}
+                onChange={(event) => relabel(index, event.target.value)}
+                aria-label={`Label for sub-task ${index + 1}`}
+                placeholder={`${index + 1} — e.g. Vitamin D3`}
+                className={FIELD}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {dropping && (
+        <p className="text-xs text-ink-3">
+          Removing {originalCount - steps.length}{' '}
+          {originalCount - steps.length === 1 ? 'sub-task' : 'sub-tasks'} also discards
+          the ticks logged against {originalCount - steps.length === 1 ? 'it' : 'them'}.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <button

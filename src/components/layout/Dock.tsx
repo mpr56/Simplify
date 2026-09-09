@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import type { Bookmark } from '@/data/types'
 import { useDashboard } from '@/store/useDashboard'
+import { normalizeBookmarkUrl } from '@/lib/bookmarks'
 
 const BASE_SIZE = 48
 
@@ -53,12 +54,9 @@ function AddBookmarkForm({ onClose }: { onClose: () => void }) {
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
     const trimmedLabel = label.trim()
-    const trimmedUrl = url.trim()
-    if (!trimmedLabel || !trimmedUrl) return
-    actions.addBookmark({
-      label: trimmedLabel,
-      url: /^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : `https://${trimmedUrl}`,
-    })
+    const normalized = normalizeBookmarkUrl(url)
+    if (!trimmedLabel || !normalized) return
+    actions.addBookmark({ label: trimmedLabel, url: normalized })
     onClose()
   }
 
@@ -160,6 +158,28 @@ export function Dock() {
               </button>
             </li>
           ))}
+
+          {/* The dock's own way in. Without it the add form below had no
+              trigger at all, and a new bookmark meant editing the document. */}
+          <li className="group relative flex flex-col items-center">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-9 whitespace-nowrap rounded-md border border-line-strong bg-surface-2 px-2 py-1 text-xs text-ink opacity-0 shadow-pop transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              Add bookmark
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setAdding((open) => !open)}
+              aria-expanded={adding}
+              aria-label="Add bookmark"
+              style={{ width: BASE_SIZE, height: BASE_SIZE }}
+              className="flex cursor-pointer items-center justify-center rounded-[28%] border border-dashed border-white/15 bg-surface-2/40 text-ink-3 transition-colors duration-200 hover:border-white/30 hover:text-ink"
+            >
+              <Plus aria-hidden="true" className="h-5 w-5" />
+            </button>
+          </li>
         </ul>
       </nav>
     </div>
