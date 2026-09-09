@@ -93,13 +93,26 @@ function Description({
   )
 }
 
-function RowActions({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
+function RowActions({
+  goal,
+  onEdit,
+  className,
+}: {
+  goal: Goal
+  onEdit: () => void
+  className?: string
+}) {
   const { actions } = useDashboard()
 
   return (
     // Revealed on hover on pointer devices; on touch, where there is no hover,
     // they stay visible.
-    <div className="flex shrink-0 items-center opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+    <div
+      className={cn(
+        'flex shrink-0 items-center opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100',
+        className,
+      )}
+    >
       <button
         type="button"
         onClick={onEdit}
@@ -145,7 +158,11 @@ function GoalRow({
         editing && 'bg-surface-2 ring-1 ring-accent/40',
       )}
     >
-      <div className="group flex items-center gap-3 px-1 py-3.5">
+      {/* Below `sm` the status/tag/progress group takes a line of its own.
+          Sharing one line with the title left the title the few pixels the
+          fixed-width controls did not want, and it rendered as "1…". DOM order
+          is the phone order; `sm:order-*` puts the group back inline. */}
+      <div className="group flex flex-wrap items-center gap-x-3 gap-y-2 px-1 py-3.5">
         {/* The checkbox is the fast path for the common transition; the status
             control next to it covers the three states a checkbox cannot say. */}
         <CheckBox
@@ -153,12 +170,15 @@ function GoalRow({
           onChange={() => actions.setGoalStatus(goal.id, done ? 'todo' : 'done')}
           color={color}
           label={`Mark "${goal.title}" ${done ? 'not done' : 'done'}`}
+          className="sm:order-1"
         />
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 sm:order-2">
           <p
             className={cn(
-              'truncate font-medium transition-colors duration-200',
+              // Two lines on the phone, where there is room below; one line
+              // from `sm` up, where the row is shared and must stay a row.
+              'line-clamp-2 font-medium transition-colors duration-200 sm:line-clamp-1',
               done ? 'text-ink-3 line-through' : 'text-ink',
             )}
           >
@@ -169,32 +189,37 @@ function GoalRow({
           </p>
         </div>
 
-        {goal.description && (
-          <InfoToggle
-            goal={goal}
-            expanded={expanded}
-            panelId={descriptionId}
-            onToggle={onToggleInfo}
+        <RowActions goal={goal} onEdit={onEdit} className="sm:order-4" />
+
+        {/* `pl-9` lines the group up under the title, not under the checkbox. */}
+        <div className="flex w-full min-w-0 items-center gap-2 pl-9 sm:order-3 sm:w-auto sm:pl-0">
+          {goal.description && (
+            <InfoToggle
+              goal={goal}
+              expanded={expanded}
+              panelId={descriptionId}
+              onToggle={onToggleInfo}
+            />
+          )}
+
+          <StatusSelect
+            status={goal.status}
+            onChange={(status) => actions.setGoalStatus(goal.id, status)}
+            label={`Status of "${goal.title}"`}
           />
-        )}
 
-        <StatusSelect
-          status={goal.status}
-          onChange={(status) => actions.setGoalStatus(goal.id, status)}
-          label={`Status of "${goal.title}"`}
-        />
+          {/* Room for it on the phone's own line, and again at `lg`; in between
+              the row is back to one line and has none to spare. */}
+          <Tag category={goal.category} className="sm:hidden lg:inline-flex" />
 
-        <Tag category={goal.category} className="hidden lg:inline-flex" />
+          <div className="min-w-0 flex-1 sm:w-28 sm:flex-none">
+            <Progress value={goal.progress} color={color} label={`${goal.title} progress`} />
+          </div>
 
-        <div className="hidden w-28 shrink-0 sm:block">
-          <Progress value={goal.progress} color={color} label={`${goal.title} progress`} />
+          <span className="nums w-11 shrink-0 text-right text-sm text-ink-2">
+            {goal.progress}%
+          </span>
         </div>
-
-        <span className="nums w-11 shrink-0 text-right text-sm text-ink-2">
-          {goal.progress}%
-        </span>
-
-        <RowActions goal={goal} onEdit={onEdit} />
       </div>
 
       {/* Indented to start under the title, not under the checkbox, so it

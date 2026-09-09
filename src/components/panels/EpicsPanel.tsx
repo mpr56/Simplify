@@ -133,14 +133,14 @@ function EpicRow({ rollup, onEdit }: { rollup: EpicRollup; onEdit: () => void })
 
   return (
     <div className="group py-3.5">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
           aria-label={`${open ? 'Hide' : 'Show'} goals under "${epic.title}"`}
           disabled={goals.length === 0}
-          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-ink-3 transition-colors duration-200 hover:bg-surface-3 hover:text-ink disabled:cursor-default disabled:opacity-30"
+          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-ink-3 transition-colors duration-200 hover:bg-surface-3 hover:text-ink disabled:cursor-default disabled:opacity-30 sm:order-1"
         >
           <ChevronRight
             aria-hidden="true"
@@ -151,10 +151,10 @@ function EpicRow({ rollup, onEdit }: { rollup: EpicRollup; onEdit: () => void })
           />
         </button>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 sm:order-2">
           <p
             className={cn(
-              'truncate font-medium',
+              'line-clamp-2 font-medium sm:line-clamp-1',
               status === 'done' ? 'text-ink-3 line-through' : 'text-ink',
             )}
           >
@@ -167,18 +167,7 @@ function EpicRow({ rollup, onEdit }: { rollup: EpicRollup; onEdit: () => void })
           </p>
         </div>
 
-        <StatusPill status={status} />
-        <Tag category={epic.category} className="hidden lg:inline-flex" />
-
-        <div className="hidden w-28 shrink-0 sm:block">
-          <Progress value={progress} color={color} label={`${epic.title} progress`} />
-        </div>
-
-        <span className="nums w-11 shrink-0 text-right text-sm text-ink-2">
-          {progress}%
-        </span>
-
-        <div className="flex shrink-0 items-center opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+        <div className="flex shrink-0 items-center opacity-100 transition-opacity duration-200 sm:order-4 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
           <button
             type="button"
             onClick={onEdit}
@@ -196,6 +185,20 @@ function EpicRow({ rollup, onEdit }: { rollup: EpicRollup; onEdit: () => void })
           >
             <X aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
+        </div>
+
+        {/* `pl-10` lines the group up under the title, matching the sub-list. */}
+        <div className="flex w-full min-w-0 items-center gap-2 pl-10 sm:order-3 sm:w-auto sm:pl-0">
+          <StatusPill status={status} />
+          <Tag category={epic.category} className="sm:hidden lg:inline-flex" />
+
+          <div className="min-w-0 flex-1 sm:w-28 sm:flex-none">
+            <Progress value={progress} color={color} label={`${epic.title} progress`} />
+          </div>
+
+          <span className="nums w-11 shrink-0 text-right text-sm text-ink-2">
+            {progress}%
+          </span>
         </div>
       </div>
 

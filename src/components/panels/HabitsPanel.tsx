@@ -178,13 +178,16 @@ export function HabitsPanel({ className }: { className?: string }) {
               const split = steps.length > 1
               const doneToday = stepsDoneOn(habit, iso)
               return (
-                <li key={habit.id} className="group flex items-center gap-3 py-2.5">
+                <li
+                  key={habit.id}
+                  className="group flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5"
+                >
                   <span
                     aria-hidden="true"
-                    className="h-6 w-6 shrink-0 rounded-lg"
+                    className="h-6 w-6 shrink-0 rounded-lg sm:order-1"
                     style={{ backgroundColor: color }}
                   />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 sm:order-2">
                     <p className="truncate text-sm font-medium text-ink">{habit.name}</p>
                     <p className="nums text-xs text-ink-3">
                       {/* The header already names the day, so the per-day count
@@ -194,10 +197,31 @@ export function HabitsPanel({ className }: { className?: string }) {
                     </p>
                   </div>
 
+                  {/* Revealed on hover on pointer devices; on touch, where there
+                      is no hover, it stays visible. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComposing(false)
+                      setEditingId(habit.id)
+                    }}
+                    aria-label={`Edit "${habit.name}"`}
+                    className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-ink-3 opacity-100 transition-opacity duration-200 hover:bg-surface-3 hover:text-ink order-2 sm:order-4 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                  >
+                    <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
+                  </button>
+
                   {/* One box or twelve, they all render through StepBox — a
                       split habit whose ticks were a different size from an
                       unsplit one read as a different kind of control. */}
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                  <div
+                    className={cn(
+                      'flex flex-wrap items-center gap-1 sm:order-3 sm:w-auto sm:shrink-0 sm:justify-end sm:pl-0',
+                      // Only a habit split more than two ways needs the extra
+                      // line; one or two boxes still fit beside the name.
+                      steps.length > 2 ? 'order-3 w-full pl-9' : 'order-1 shrink-0',
+                    )}
+                  >
                     {steps.map((step, index) => (
                       <StepBox
                         key={step.id}
@@ -212,19 +236,6 @@ export function HabitsPanel({ className }: { className?: string }) {
                       />
                     ))}
                   </div>
-                  {/* Revealed on hover on pointer devices; on touch, where there
-                      is no hover, it stays visible. */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setComposing(false)
-                      setEditingId(habit.id)
-                    }}
-                    aria-label={`Edit "${habit.name}"`}
-                    className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-ink-3 opacity-100 transition-opacity duration-200 hover:bg-surface-3 hover:text-ink sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                  >
-                    <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
-                  </button>
                 </li>
               )
             })}

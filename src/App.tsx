@@ -21,8 +21,7 @@ function Dashboard() {
   useTaskBadge(overdueCount(state.data.tasks, now))
 
   return (
-    // Bottom padding clears the fixed dock so the last card is never covered.
-    <div className="mx-auto flex max-w-[1700px] flex-col gap-5 px-4 pt-6 pb-28 lg:px-8">
+    <div className="mx-auto flex max-w-[1700px] flex-col gap-5 px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))] lg:px-8">
       <TopBar />
 
       <Tabs.Root

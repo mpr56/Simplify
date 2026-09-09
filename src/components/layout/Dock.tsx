@@ -117,7 +117,7 @@ export function Dock() {
   const [adding, setAdding] = useState(false)
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center pb-5">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
       <div className="pointer-events-auto">{adding && <AddBookmarkForm onClose={() => setAdding(false)} />}</div>
 
       <nav
