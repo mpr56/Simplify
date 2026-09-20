@@ -114,6 +114,51 @@ describe('normalizeData tasks migration', () => {
     expect(result.macroTargets.kcal).toBe(2100)
     expect(result.goals).toEqual([])
   })
+
+  it('keeps a goalId that matches a known goal', () => {
+    const result = normalizeData(
+      storedDocument({
+        goals: [{ id: 'goal-1', title: 'Ship it' }],
+        tasks: [{ id: 'task-1', title: 'Write the doc', done: false, goalId: 'goal-1' }],
+      }),
+      TODAY,
+    )
+
+    expect(result.tasks[0].goalId).toBe('goal-1')
+  })
+
+  it('drops a goalId that does not match any known goal', () => {
+    const result = normalizeData(
+      storedDocument({
+        tasks: [{ id: 'task-1', title: 'Orphaned', done: false, goalId: 'goal-missing' }],
+      }),
+      TODAY,
+    )
+
+    expect(result.tasks[0].goalId).toBeUndefined()
+  })
+
+  it('keeps a task description, trimmed', () => {
+    const result = normalizeData(
+      storedDocument({
+        tasks: [{ id: 'task-1', title: 'Write the doc', done: false, description: '  notes  ' }],
+      }),
+      TODAY,
+    )
+
+    expect(result.tasks[0].description).toBe('notes')
+  })
+
+  it('drops a blank task description', () => {
+    const result = normalizeData(
+      storedDocument({
+        tasks: [{ id: 'task-1', title: 'Write the doc', done: false, description: '   ' }],
+      }),
+      TODAY,
+    )
+
+    expect(result.tasks[0].description).toBeUndefined()
+  })
 })
 
 describe('normalizeData habit steps migration', () => {

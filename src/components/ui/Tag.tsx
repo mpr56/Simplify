@@ -5,9 +5,12 @@ import { cn } from '@/lib/cn'
 
 export function Tag({
   category,
+  label,
   className,
 }: {
   category: CategoryId
+  /** Overrides the category's own label — e.g. a linked goal's title, colored by its category. */
+  label?: string
   className?: string
 }) {
   return (
@@ -19,7 +22,7 @@ export function Tag({
         className,
       )}
     >
-      {CATEGORIES[category].label}
+      {label ?? CATEGORIES[category].label}
     </span>
   )
 }

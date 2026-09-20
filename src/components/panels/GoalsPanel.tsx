@@ -8,14 +8,17 @@ import { Tag } from '@/components/ui/Tag'
 import { GoalForm, type GoalDraft } from './GoalForm'
 import { useDashboard } from '@/store/useDashboard'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
-import { filterGoals, standaloneGoals } from '@/lib/selectors'
+import { useNow } from '@/hooks/useNow'
+import { filterGoals, standaloneGoals, tasksOf } from '@/lib/selectors'
 import { categoryColor } from '@/lib/colors'
+import { formatDueLabel } from '@/lib/tasks'
 import {
   GOAL_STATUSES,
   STATUS_LABELS,
   type Epic,
   type Goal,
   type GoalStatus,
+  type Task,
 } from '@/data/types'
 import { cn } from '@/lib/cn'
 
@@ -36,9 +39,10 @@ function draftOf(goal: Goal): GoalDraft {
 }
 
 /**
- * The disclosure for `goal.description`. Rendered only when there is one to
- * show — an info control that opens onto nothing is worse than no control, and
- * it keeps the row from growing a permanent slot most goals leave empty.
+ * The disclosure for a goal's description and its composing tasks. Rendered
+ * only when there is something to show — a control that opens onto nothing is
+ * worse than no control, and it keeps the row from growing a permanent slot
+ * most goals leave empty.
  */
 function InfoToggle({
   goal,
@@ -57,8 +61,8 @@ function InfoToggle({
       onClick={onToggle}
       aria-expanded={expanded}
       aria-controls={panelId}
-      aria-label={`${expanded ? 'Hide' : 'Show'} description for "${goal.title}"`}
-      title={expanded ? 'Hide description' : 'Show description'}
+      aria-label={`${expanded ? 'Hide' : 'Show'} details for "${goal.title}"`}
+      title={expanded ? 'Hide details' : 'Show details'}
       className={cn(
         'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-200 hover:bg-surface-3 hover:text-ink',
         expanded ? 'text-accent-soft' : 'text-ink-3',
@@ -90,6 +94,35 @@ function Description({
     >
       {children}
     </p>
+  )
+}
+
+/**
+ * The goal's real composition — as opposed to `subtasksDone`/`subtasksTotal`,
+ * which stay a separate, manually-weighted number. Read-only: ticking a task
+ * done or editing it still happens in the Tasks panel.
+ */
+function TaskList({ tasks, now, className }: { tasks: Task[]; now: number; className?: string }) {
+  return (
+    <ul className={cn('flex flex-col gap-1', className)}>
+      {tasks.map((task) => (
+        <li key={task.id} className="flex items-center gap-2 text-sm">
+          <span
+            aria-hidden="true"
+            className={cn(
+              'h-1.5 w-1.5 shrink-0 rounded-full',
+              task.done ? 'bg-good' : 'bg-ink-3',
+            )}
+          />
+          <span className={cn('min-w-0 flex-1 truncate', task.done ? 'text-ink-3 line-through' : 'text-ink-2')}>
+            {task.title}
+          </span>
+          {task.dueAt && !task.done && (
+            <span className="nums shrink-0 text-xs text-ink-3">{formatDueLabel(task.dueAt, now)}</span>
+          )}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -135,12 +168,17 @@ function RowActions({
 
 function GoalRow({
   goal,
+  tasks,
+  now,
   editing,
   expanded,
   onEdit,
   onToggleInfo,
 }: {
   goal: Goal
+  /** This goal's linked tasks, already filtered by the caller. */
+  tasks: Task[]
+  now: number
   editing: boolean
   expanded: boolean
   onEdit: () => void
@@ -193,7 +231,7 @@ function GoalRow({
 
         {/* `pl-9` lines the group up under the title, not under the checkbox. */}
         <div className="flex w-full min-w-0 items-center gap-2 pl-9 sm:order-3 sm:w-auto sm:pl-0">
-          {goal.description && (
+          {(goal.description || tasks.length > 0) && (
             <InfoToggle
               goal={goal}
               expanded={expanded}
@@ -224,10 +262,11 @@ function GoalRow({
 
       {/* Indented to start under the title, not under the checkbox, so it
           reads as belonging to the goal rather than to the list. */}
-      {expanded && goal.description && (
-        <Description id={descriptionId} className="mb-3 ml-10 mr-1">
-          {goal.description}
-        </Description>
+      {expanded && (goal.description || tasks.length > 0) && (
+        <div id={descriptionId} className="mb-3 ml-10 mr-1 flex flex-col gap-2">
+          {goal.description && <Description id={`${descriptionId}-text`}>{goal.description}</Description>}
+          {tasks.length > 0 && <TaskList tasks={tasks} now={now} />}
+        </div>
       )}
     </div>
   )
@@ -235,6 +274,8 @@ function GoalRow({
 
 function GoalCard({
   goal,
+  tasks,
+  now,
   epic,
   editing,
   dragging,
@@ -245,6 +286,9 @@ function GoalCard({
   onDragEnd,
 }: {
   goal: Goal
+  /** This goal's linked tasks, already filtered by the caller. */
+  tasks: Task[]
+  now: number
   epic: Epic | undefined
   editing: boolean
   dragging: boolean
@@ -282,7 +326,7 @@ function GoalCard({
         >
           {goal.title}
         </p>
-        {goal.description && (
+        {(goal.description || tasks.length > 0) && (
           <InfoToggle
             goal={goal}
             expanded={expanded}
@@ -299,10 +343,11 @@ function GoalCard({
         </p>
       )}
 
-      {expanded && goal.description && (
-        <Description id={descriptionId} className="mt-2">
-          {goal.description}
-        </Description>
+      {expanded && (goal.description || tasks.length > 0) && (
+        <div id={descriptionId} className="mt-2 flex flex-col gap-2">
+          {goal.description && <Description id={`${descriptionId}-text`}>{goal.description}</Description>}
+          {tasks.length > 0 && <TaskList tasks={tasks} now={now} />}
+        </div>
       )}
 
       <div className="mt-2.5 flex items-center gap-2">
@@ -334,6 +379,8 @@ function GoalCard({
 function BoardColumn({
   status,
   goals,
+  tasksOf: goalTasksOf,
+  now,
   epicOf,
   editingId,
   draggingId,
@@ -349,6 +396,8 @@ function BoardColumn({
 }: {
   status: GoalStatus
   goals: Goal[]
+  tasksOf: (goal: Goal) => Task[]
+  now: number
   epicOf: (goal: Goal) => Epic | undefined
   editingId: string | null
   draggingId: string | null
@@ -395,6 +444,8 @@ function BoardColumn({
           <GoalCard
             key={goal.id}
             goal={goal}
+            tasks={goalTasksOf(goal)}
+            now={now}
             epic={epicOf(goal)}
             editing={editingId === goal.id}
             dragging={draggingId === goal.id}
@@ -434,10 +485,12 @@ export function GoalsPanel({ className }: { className?: string }) {
     })
   }
 
-  const { epics } = state.data
+  const now = useNow()
+  const { epics, tasks } = state.data
   const goals = filterGoals(state.data.goals, state.query)
   const editing = goals.find((goal) => goal.id === editingId) ?? null
   const epicOf = (goal: Goal) => epics.find((epic) => epic.id === goal.epicId)
+  const goalTasksOf = (goal: Goal) => tasksOf(tasks, goal.id)
 
   // One editor slot at the top rather than an inline one per row: it is the
   // only place a form of this size fits in both the list and a board column.
@@ -562,6 +615,8 @@ export function GoalsPanel({ className }: { className?: string }) {
                 key={status}
                 status={status}
                 goals={goals.filter((goal) => goal.status === status)}
+                tasksOf={goalTasksOf}
+                now={now}
                 epicOf={epicOf}
                 editingId={editingId}
                 draggingId={draggingId}
@@ -596,6 +651,8 @@ export function GoalsPanel({ className }: { className?: string }) {
                     <li key={goal.id}>
                       <GoalRow
                         goal={goal}
+                        tasks={goalTasksOf(goal)}
+                        now={now}
                         editing={editingId === goal.id}
                         expanded={expandedIds.has(goal.id)}
                         onEdit={() => startEditing(goal.id)}

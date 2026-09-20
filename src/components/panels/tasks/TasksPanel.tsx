@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { useDashboard } from '@/store/useDashboard'
 import { useNow } from '@/hooks/useNow'
@@ -10,8 +10,9 @@ import { cn } from '@/lib/cn'
 export function TasksPanel({ className }: { className?: string }) {
   const { state, actions } = useDashboard()
   const now = useNow()
-  const { tasks } = state.data
+  const { tasks, goals } = state.data
   const query = state.query.trim().toLowerCase()
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const visible = useMemo(() => {
     const matching = query
@@ -59,7 +60,14 @@ export function TasksPanel({ className }: { className?: string }) {
           <ul className="flex flex-col">
             {visible.map((task) => (
               <li key={task.id}>
-                <TaskRow task={task} now={now} />
+                <TaskRow
+                  task={task}
+                  now={now}
+                  goals={goals}
+                  editing={editingId === task.id}
+                  onEdit={() => setEditingId(task.id)}
+                  onCancelEdit={() => setEditingId(null)}
+                />
               </li>
             ))}
           </ul>

@@ -6,7 +6,7 @@ export type ISODateTime = string
 
 export type Period = 'daily' | 'weekly' | 'monthly'
 
-export type CategoryId = 'money' | 'gym' | 'coding' | 'work' | 'health'
+export type CategoryId = 'money' | 'gym' | 'coding' | 'work' | 'health' | 'content'
 
 export interface Category {
   id: CategoryId
@@ -69,6 +69,11 @@ export interface Task {
   completedAt?: ISODateTime
   /** Optional, unlike `Goal.category` — quick capture must not force a choice. */
   category?: CategoryId
+  /** The goal this task breaks down. Unset means standalone. */
+  goalId?: string
+  /** Detail worth keeping only once a task is technical enough to need it —
+   * shown in the UI only when `goalId` is set, so quick tasks stay one line. */
+  description?: string
   createdAt: ISODateTime
 }
 
@@ -189,6 +194,7 @@ export const CATEGORIES: Record<CategoryId, Category> = {
   coding: { id: 'coding', label: 'Coding', token: 'var(--color-series-3)' },
   work: { id: 'work', label: 'Work', token: 'var(--color-series-4)' },
   health: { id: 'health', label: 'Health', token: 'var(--color-series-5)' },
+  content: { id: 'content', label: 'Content', token: 'var(--color-series-6)' },
 }
 
 export const CATEGORY_LIST: Category[] = Object.values(CATEGORIES)

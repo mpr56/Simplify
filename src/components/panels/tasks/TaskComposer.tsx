@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useDashboard } from '@/store/useDashboard'
+import { CATEGORY_LIST, type CategoryId } from '@/data/types'
+
+/** Sentinel for "no category" — a select cannot hold `undefined`. */
+const NO_CATEGORY = ''
 
 /** `datetime-local` speaks local wall-clock time with no zone, e.g. 2026-09-04T18:00. */
 function toLocalInputValue(date: Date): string {
@@ -26,6 +30,7 @@ export function TaskComposer() {
   const { actions } = useDashboard()
   const [title, setTitle] = useState('')
   const [dueLocal, setDueLocal] = useState('')
+  const [category, setCategory] = useState<CategoryId | typeof NO_CATEGORY>(NO_CATEGORY)
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -36,9 +41,14 @@ export function TaskComposer() {
     const parsed = dueLocal ? new Date(dueLocal) : null
     const dueAt = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : undefined
 
-    actions.addTask({ title: trimmed, ...(dueAt ? { dueAt } : {}) })
+    actions.addTask({
+      title: trimmed,
+      ...(dueAt ? { dueAt } : {}),
+      ...(category !== NO_CATEGORY ? { category } : {}),
+    })
     setTitle('')
     setDueLocal('')
+    setCategory(NO_CATEGORY)
   }
 
   return (
@@ -85,6 +95,23 @@ export function TaskComposer() {
             {chip.label}
           </button>
         ))}
+
+        <label htmlFor="task-category" className="sr-only">
+          Category
+        </label>
+        <select
+          id="task-category"
+          value={category}
+          onChange={(event) => setCategory(event.target.value as CategoryId | typeof NO_CATEGORY)}
+          className="h-8 cursor-pointer rounded-lg border border-line bg-surface-2 px-2 text-xs text-ink-2 focus:border-accent focus:outline-none"
+        >
+          <option value={NO_CATEGORY}>No category</option>
+          {CATEGORY_LIST.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
       </div>
     </form>
   )

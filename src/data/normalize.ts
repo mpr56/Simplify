@@ -60,7 +60,7 @@ function optionalCategory(value: unknown): CategoryId | undefined {
   return typeof value === 'string' && value in CATEGORIES ? (value as CategoryId) : undefined
 }
 
-function normalizeTask(input: unknown, nowISO: ISODateTime): Task | null {
+function normalizeTask(input: unknown, nowISO: ISODateTime, goalIds: Set<string>): Task | null {
   if (!isRecord(input) || typeof input.id !== 'string') return null
 
   const done = input.done === true
@@ -69,6 +69,14 @@ function normalizeTask(input: unknown, nowISO: ISODateTime): Task | null {
   // completion time, whatever the stored document claims.
   const completedAt = done ? isoDateTime(input.completedAt) : undefined
   const category = optionalCategory(input.category)
+  // A goal that was deleted out from under a task leaves the task unlinked
+  // rather than pointing at nothing.
+  const goalId =
+    typeof input.goalId === 'string' && goalIds.has(input.goalId) ? input.goalId : undefined
+  const description =
+    typeof input.description === 'string' && input.description.trim()
+      ? input.description.trim()
+      : undefined
 
   return {
     id: input.id,
@@ -77,6 +85,8 @@ function normalizeTask(input: unknown, nowISO: ISODateTime): Task | null {
     done,
     ...(completedAt ? { completedAt } : {}),
     ...(category ? { category } : {}),
+    ...(goalId ? { goalId } : {}),
+    ...(description ? { description } : {}),
     createdAt: isoDateTime(input.createdAt) ?? nowISO,
   }
 }
@@ -272,6 +282,13 @@ export function normalizeData(input: unknown, today: Date): DashboardData {
     : []
   const epicIds = new Set(epics.map((epic) => epic.id))
 
+  const goals = Array.isArray(candidate.goals)
+    ? candidate.goals
+        .map((goal) => normalizeGoal(goal, epicIds, todayISO))
+        .filter((goal): goal is Goal => goal !== null)
+    : fallback.goals
+  const goalIds = new Set(goals.map((goal) => goal.id))
+
   return {
     epics,
     trash: Array.isArray(candidate.trash)
@@ -280,16 +297,12 @@ export function normalizeData(input: unknown, today: Date): DashboardData {
           .filter((entry): entry is TrashEntry => entry !== null)
           .slice(0, TRASH_LIMIT)
       : [],
-    goals: Array.isArray(candidate.goals)
-      ? candidate.goals
-          .map((goal) => normalizeGoal(goal, epicIds, todayISO))
-          .filter((goal): goal is Goal => goal !== null)
-      : fallback.goals,
+    goals,
     // A document predating tasks migrates to an empty list. Falling back to
     // `fallback.tasks` here would inject seed tasks into a real document.
     tasks: Array.isArray(candidate.tasks)
       ? candidate.tasks
-          .map((task) => normalizeTask(task, nowISO))
+          .map((task) => normalizeTask(task, nowISO, goalIds))
           .filter((task): task is Task => task !== null)
       : [],
     habits: Array.isArray(candidate.habits)

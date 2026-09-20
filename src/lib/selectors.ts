@@ -7,6 +7,7 @@ import type {
   ISODate,
   MacroEntry,
   MacroTargets,
+  Task,
 } from '@/data/types'
 import { addDays, eachDay, toISO } from './date'
 
@@ -100,6 +101,11 @@ export function activeGoals(goals: Goal[]): Goal[] {
 
 export function goalsByStatus(goals: Goal[], status: GoalStatus): Goal[] {
   return goals.filter((goal) => goal.status === status)
+}
+
+/** The real tasks broken out under a goal, as opposed to its manual sub-task count. */
+export function tasksOf(tasks: Task[], goalId: string): Task[] {
+  return tasks.filter((task) => task.goalId === goalId)
 }
 
 export interface EpicRollup {

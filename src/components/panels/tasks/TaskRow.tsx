@@ -1,10 +1,11 @@
-import { X } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
 import { CheckBox } from '@/components/ui/CheckBox'
 import { Tag } from '@/components/ui/Tag'
+import { TaskForm, type TaskDraft } from './TaskForm'
 import { useDashboard } from '@/store/useDashboard'
 import { categoryColor } from '@/lib/colors'
 import { formatDueLabel, urgencyOf, type TaskUrgency } from '@/lib/tasks'
-import type { Task } from '@/data/types'
+import type { Goal, Task } from '@/data/types'
 import { cn } from '@/lib/cn'
 
 /**
@@ -27,11 +28,47 @@ const URGENCY_STYLES: Record<TaskUrgency, { rail: string; label: string; wash: s
   none: { rail: 'bg-transparent', label: 'text-ink-3', wash: '' },
 }
 
-export function TaskRow({ task, now }: { task: Task; now: number }) {
+export function TaskRow({
+  task,
+  now,
+  goals,
+  editing,
+  onEdit,
+  onCancelEdit,
+}: {
+  task: Task
+  now: number
+  /** Goals a task can roll up into, and where a linked goal's title is read from. */
+  goals: Goal[]
+  editing: boolean
+  onEdit: () => void
+  onCancelEdit: () => void
+}) {
   const { actions } = useDashboard()
   const urgency = urgencyOf(task, now)
   const styles = URGENCY_STYLES[urgency]
   const dueLabel = task.dueAt ? formatDueLabel(task.dueAt, now) : ''
+  const goal = task.goalId ? goals.find((item) => item.id === task.goalId) : undefined
+
+  if (editing) {
+    return (
+      <TaskForm
+        initial={{
+          title: task.title,
+          dueAt: task.dueAt,
+          category: task.category,
+          goalId: task.goalId,
+          description: task.description,
+        }}
+        goals={goals}
+        onSubmit={(draft: TaskDraft) => {
+          actions.updateTask(task.id, draft)
+          onCancelEdit()
+        }}
+        onCancel={onCancelEdit}
+      />
+    )
+  }
 
   return (
     <div
@@ -64,16 +101,33 @@ export function TaskRow({ task, now }: { task: Task; now: number }) {
         )}
       </div>
 
+      {goal && (
+        <Tag
+          category={goal.category}
+          label={goal.title}
+          className="hidden max-w-32 shrink-0 truncate sm:inline-flex"
+        />
+      )}
       {task.category && <Tag category={task.category} className="hidden shrink-0 sm:inline-flex" />}
 
-      <button
-        type="button"
-        onClick={() => actions.removeTask(task.id)}
-        aria-label={`Delete "${task.title}"`}
-        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-ink-3 opacity-100 transition-all duration-200 hover:bg-surface-3 hover:text-critical sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-      >
-        <X aria-hidden="true" className="h-3.5 w-3.5" />
-      </button>
+      <div className="flex shrink-0 items-center opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Edit "${task.title}"`}
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-ink-3 transition-colors duration-200 hover:bg-surface-3 hover:text-ink"
+        >
+          <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => actions.removeTask(task.id)}
+          aria-label={`Delete "${task.title}"`}
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-ink-3 transition-colors duration-200 hover:bg-surface-3 hover:text-critical"
+        >
+          <X aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   )
 }
